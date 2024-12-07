@@ -33,7 +33,7 @@
 - 🌐 支持 [多种语言](#language) 和 [诸多翻译服务](#services)
 - 🤖 提供 [命令行工具](#usage)，[图形交互界面](#gui)，以及 [容器化部署](#docker)
 
-欢迎在 [GitHub Issues](https://github.com/Byaidu/PDFMathTranslate/issues)、[Telegram 用户群](https://t.me/+Z9_SgnxmsmA5NzBl) 或 [QQ 用户群](https://qm.qq.com/q/DixZCxQej0) 中提供反馈。
+欢迎在 [GitHub Issues](https://github.com/Byaidu/PDFMathTranslate/issues)、[Telegram 用户群](https://t.me/+Z9_SgnxmsmA5NzBl) 或 [QQ 用户群](https://qm.qq.com/q/DixZCxQej0) 中提供反馈
 
 <h2 id="updates">近期更新</h2>
 
@@ -57,12 +57,12 @@
 
 ### 免费服务 (<https://pdf2zh.com/>)
 
-你可以立即尝试 [免费公共服务](https://pdf2zh.com/) 而无需安装。
+你可以立即尝试 [免费公共服务](https://pdf2zh.com/) 而无需安装
 
 ### Hugging Face 在线演示
 
-你可以立即尝试 [在 HuggingFace 上的在线演示](https://huggingface.co/spaces/reycn/PDFMathTranslate-Docker) 而无需安装。
-请注意，演示的计算资源有限，因此请避免滥用。
+你可以立即尝试 [在 HuggingFace 上的在线演示](https://huggingface.co/spaces/reycn/PDFMathTranslate-Docker) 而无需安装
+请注意，演示的计算资源有限，因此请避免滥用
 
 <h2 id="install">安装和使用</h2>
 
@@ -131,17 +131,16 @@
 
 用于在云服务上部署容器镜像：
 
+<div>
 <a href="https://www.heroku.com/deploy?template=https://github.com/Byaidu/PDFMathTranslate">
   <img src="https://www.herokucdn.com/deploy/button.svg" alt="Deploy" height="26"></a>
-
 <a href="https://render.com/deploy">
   <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Koyeb" height="26"></a>
-
 <a href="https://zeabur.com/templates/5FQIGX?referralCode=reycn">
   <img src="https://zeabur.com/button.svg" alt="Deploy on Zeabur" height="26"></a>
-
 <a href="https://app.koyeb.com/deploy?type=git&builder=buildpack&repository=github.com/Byaidu/PDFMathTranslate&branch=main&name=pdf-math-translate">
   <img src="https://www.koyeb.com/static/images/deploy/button.svg" alt="Deploy to Koyeb" height="26"></a>
+</div>
 
 <h2 id="usage">高级选项</h2>
 
@@ -163,8 +162,6 @@
 | `-t`  | [多线程](#threads) | `pdf2zh example.pdf -t 1` |
 | `-o`  | 输出目录 | `pdf2zh example.pdf -o output` |
 | `-f`, `-c` | [例外规则](#exceptions) | `pdf2zh example.pdf -f "(MS.*)"` |
-
-某些服务需要 [设置环境变量](https://chatgpt.com/share/6734a83d-9d48-800e-8a46-f57ca6e8bcb4)
 
 <h3 id="partial">全文或部分文档翻译</h3>
 
@@ -190,82 +187,32 @@ pdf2zh example.pdf -li en -lo ja
 
 <h3 id="services">使用不同的翻译服务</h3>
 
-- **DeepL**
+下表列出了每个翻译服务所需的 [环境变量](https://chatgpt.com/share/6734a83d-9d48-800e-8a46-f57ca6e8bcb4)，在使用相应服务之前，请确保已设置这些变量
 
-参考 [DeepL](https://support.deepl.com/hc/en-us/articles/360020695820-API-Key-for-DeepL-s-API)
+|**Translator**|**Service**|**Environment Variables**|**Default Values**|**Notes**|
+|-|-|-|-|-|
+|**Google (Default)**|`google`|None|N/A|None|
+|**Bing**|`bing`|None|N/A|None|
+|**DeepL**|`deepl`|`DEEPL_SERVER_URL`,`DEEPL_AUTH_KEY`|`https://api.deepl.com`, `[Your Key]`|See [DeepL](https://support.deepl.com/hc/en-us/articles/360020695820-API-Key-for-DeepL-s-API)|
+|**DeepLX**|`deeplx`|`DEEPLX_ENDPOINT`|`https://api.deepl.com/translate`|See [DeepLX](https://github.com/OwO-Network/DeepLX)|
+|**Ollama**|`ollama`|`OLLAMA_HOST`, `OLLAMA_MODEL`|`http://127.0.0.1:11434`, `gemma2`|See [Ollama](https://github.com/ollama/ollama)|
+|**OpenAI**|`openai`|`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`|`https://api.openai.com/v1`, `[Your Key]`, `gpt-4o-mini`|See [OpenAI](https://platform.openai.com/docs/overview)|
+|**Zhipu**|`zhipu`|`ZHIPU_API_KEY`, `ZHIPU_MODEL`|`[Your Key]`, `glm-4-flash`|See [Zhipu](https://open.bigmodel.cn/dev/api/thirdparty-frame/openai-sdk)|
+|**Silicon**|`silicon`|`SILICON_API_KEY`, `SILICON_MODEL`|`[Your Key]`, `Qwen/Qwen2.5-7B-Instruct`|See [SiliconCloud](https://docs.siliconflow.cn/quickstart)|
+|**Azure**|`azure`|`AZURE_ENDPOINT`, `AZURE_API_KEY`|`https://api.translator.azure.cn`, `[Your Key]`|See [Azure](https://docs.azure.cn/en-us/ai-services/translator/text-translation-overview)|
+|**Tencent**|`tencent`|`TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`|`[Your ID]`, `[Your Key]`|See [Tencent](https://www.tencentcloud.com/products/tmt?from_qcintl=122110104)|
 
-设置环境变量构建接入点：`{DEEPL_SERVER_URL}/translate`
-
-- `DEEPL_SERVER_URL`（可选）, e.g., `export DEEPL_SERVER_URL=https://api.deepl.com`
-- `DEEPL_AUTH_KEY`, e.g., `export DEEPL_AUTH_KEY=xxx`
+使用 `-s service` 或 `-s service:model` 指定翻译服务:
 
 ```bash
-pdf2zh example.pdf -s deepl
+pdf2zh example.pdf -s openai:gpt-4o-mini
 ```
 
-- **DeepLX**
-
-参考 [DeepLX](https://github.com/OwO-Network/DeepLX)
-
-设置环境变量构建接入点：`{DEEPLX_SERVER_URL}/translate`
-
-- `DEEPLX_SERVER_URL`（可选）, e.g., `export DEEPLX_SERVER_URL=https://api.deepl.com`
-- `DEEPLX_AUTH_KEY`, e.g., `export DEEPLX_AUTH_KEY=xxx`
+或者使用环境变量指定模型：
 
 ```bash
-pdf2zh example.pdf -s deepl
-```
-
-- **Ollama**
-
-参考 [Ollama](https://github.com/ollama/ollama)
-
-设置环境变量构建接入点：`{OLLAMA_HOST}/api/chat`
-
-- `OLLAMA_HOST`（可选）, e.g., `export OLLAMA_HOST=https://localhost:11434`
-
-```bash
-pdf2zh example.pdf -s ollama:gemma2
-```
-
-- **支持 OpenAI 协议的 LLM（如 OpenAI、SiliconCloud、Zhipu）**
-
-参考 [SiliconCloud](https://docs.siliconflow.cn/quickstart), [Zhipu](https://open.bigmodel.cn/dev/api/thirdparty-frame/openai-sdk)
-
-设置环境变量构建接入点：`{OPENAI_BASE_URL}/chat/completions`
-
-- `OPENAI_BASE_URL`（可选）, e.g., `export OPENAI_BASE_URL=https://api.openai.com/v1`
-- `OPENAI_API_KEY`, e.g., `export OPENAI_API_KEY=xxx`
-
-```bash
-pdf2zh example.pdf -s openai:gpt-4o
-```
-
-- **Azure**
-
-参考 [Azure Text Translation](https://docs.azure.cn/en-us/ai-services/translator/text-translation-overview)
-
-需设置以下环境变量：
-
-- `AZURE_APIKEY`, e.g., `export AZURE_APIKEY=xxx`
-- `AZURE_ENDPOINT`, e.g., `export AZURE_ENDPOINT=https://api.translator.azure.cn/`
-- `AZURE_REGION`, e.g., `export AZURE_REGION=chinaeast2`
-
-```bash
-pdf2zh example.pdf -s azure
-```
-
-- **腾讯机器翻译**
-
-参考 [腾讯机器翻译](https://cloud.tencent.com/product/tmt)
-
-需设置以下环境变量：
-
-- `TENCENT_SECRET_ID`, e.g., `export TENCENT_SECRET_ID=AKIDxxx`
-- `TENCENT_SECRET_KEY`, e.g., `export TENCENT_SECRET_KEY=xxx`
-
-```bash
-pdf2zh example.pdf -s tencent
+set OPENAI_MODEL=gpt-4o-mini
+pdf2zh example.pdf -s openai
 ```
 
 <h3 id="exceptions">指定例外规则</h3>
@@ -297,6 +244,8 @@ pdf2zh example.pdf -t 1
 - 布局解析：[DocLayout-YOLO](https://github.com/opendatalab/DocLayout-YOLO)
 
 - 文档标准：[PDF Explained](https://zxyle.github.io/PDF-Explained/), [PDF Cheat Sheets](https://pdfa.org/resource/pdf-cheat-sheets/)
+
+- 多语言字体：[Go Noto Universal](https://github.com/satbyy/go-noto-universal)
 
 <h2 id="contrib">贡献者</h2>
 

@@ -3,22 +3,38 @@ import shutil
 from pathlib import Path
 from pdf2zh import __version__
 from pdf2zh.pdf2zh import extract_text
+from pdf2zh.translator import (
+    BaseTranslator,
+    GoogleTranslator,
+    BingTranslator,
+    DeepLTranslator,
+    DeepLXTranslator,
+    OllamaTranslator,
+    OpenAITranslator,
+    ZhipuTranslator,
+    SiliconTranslator,
+    AzureTranslator,
+    TencentTranslator,
+)
 
 import gradio as gr
 import numpy as np
 import pymupdf
 import tqdm
 import requests
+import cgi
 
-# Map service names to pdf2zh service options
-service_map = {
-    "Google": "google",
-    "DeepL": "deepl",
-    "DeepLX": "deeplx",
-    "Ollama": "ollama",
-    "OpenAI": "openai",
-    "Azure": "azure",
-    "Tencent": "tencent",
+service_map: dict[str, BaseTranslator] = {
+    "Google": GoogleTranslator,
+    "Bing": BingTranslator,
+    "DeepL": DeepLTranslator,
+    "DeepLX": DeepLXTranslator,
+    "Ollama": OllamaTranslator,
+    "OpenAI": OpenAITranslator,
+    "Zhipu": ZhipuTranslator,
+    "Silicon": SiliconTranslator,
+    "Azure": AzureTranslator,
+    "Tencent": TencentTranslator,
 }
 lang_map = {
     "Chinese": "zh",
@@ -38,29 +54,25 @@ page_map = {
 }
 
 flag_demo = False
-if os.environ.get("PDF2ZH_DEMO"):
+if os.getenv("PDF2ZH_DEMO"):
     flag_demo = True
     service_map = {
-        "Google": "google",
+        "Google": GoogleTranslator,
     }
     page_map = {
         "First": [0],
         "First 20 pages": list(range(0, 20)),
     }
-    client_key = os.environ.get("PDF2ZH_CLIENT_KEY")
-    server_key = os.environ.get("PDF2ZH_SERVER_KEY")
+    client_key = os.getenv("PDF2ZH_CLIENT_KEY")
+    server_key = os.getenv("PDF2ZH_SERVER_KEY")
 
 
 def verify_recaptcha(response):
     recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
-
     print("reCAPTCHA", server_key, response)
-
     data = {"secret": server_key, "response": response}
     result = requests.post(recaptcha_url, data=data).json()
-
     print("reCAPTCHA", result.get("success"))
-
     return result.get("success")
 
 
@@ -73,33 +85,43 @@ def pdf_preview(file):
 
 
 def upload_file(file, service, progress=gr.Progress()):
-    """Handle file upload, validation, and initial preview."""
-    if not file or not os.path.exists(file):
-        return None, None
+    preview_image = pdf_preview(file)
+    return file, preview_image
 
-    try:
-        # Convert first page for preview
-        preview_image = pdf_preview(file)
 
-        return file, preview_image
-    except Exception as e:
-        print(f"Error converting PDF: {e}")
-        return None, None
+def download_with_limit(url, save_path, size_limit):
+    chunk_size = 1024
+    total_size = 0
+    with requests.get(url, stream=True, timeout=10) as response:
+        response.raise_for_status()
+        content = response.headers.get("Content-Disposition")
+        try:  # filename from header
+            _, params = cgi.parse_header(content)
+            filename = params["filename"]
+        except Exception:  # filename from url
+            filename = os.path.basename(url)
+        with open(save_path / filename, "wb") as file:
+            for chunk in response.iter_content(chunk_size=chunk_size):
+                total_size += len(chunk)
+                if size_limit and total_size > size_limit:
+                    raise gr.Error("Exceeds file size limit")
+                file.write(chunk)
+    return save_path / filename
 
 
 def translate(
-    file_path,
+    file_type,
+    file_input,
+    link_input,
     service,
-    model_id,
-    lang,
+    lang_from,
+    lang_to,
     page_range,
     recaptcha_response,
     progress=gr.Progress(),
+    *envs,
 ):
     """Translate PDF content using selected service."""
-    if not file_path:
-        raise gr.Error("No input")
-
     if flag_demo and not verify_recaptcha(recaptcha_response):
         raise gr.Error("reCAPTCHA fail")
 
@@ -107,17 +129,32 @@ def translate(
 
     output = Path("pdf2zh_files")
     output.mkdir(parents=True, exist_ok=True)
+
+    if file_type == "File":
+        if not file_input:
+            raise gr.Error("No input")
+        file_path = shutil.copy(file_input, output)
+    else:
+        if not link_input:
+            raise gr.Error("No input")
+        file_path = download_with_limit(
+            link_input,
+            output,
+            5 * 1024 * 1024 if flag_demo else None,
+        )
+
     filename = os.path.splitext(os.path.basename(file_path))[0]
     file_en = output / f"{filename}.pdf"
     file_zh = output / f"{filename}-zh.pdf"
     file_dual = output / f"{filename}-dual.pdf"
-    shutil.copyfile(file_path, file_en)
 
-    selected_service = service_map.get(service, "google")
-    selected_page = page_map.get(page_range, [0])
-    lang_to = lang_map.get(lang, "zh")
-    if selected_service == "google":
-        lang_to = "zh-CN" if lang_to == "zh" else lang_to
+    translator = service_map[service]
+    selected_page = page_map[page_range]
+    lang_from = lang_map[lang_from]
+    lang_to = lang_map[lang_to]
+
+    for i, env in enumerate(translator.envs.items()):
+        os.environ[env[0]] = envs[i]
 
     print(f"Files before translation: {os.listdir(output)}")
 
@@ -127,9 +164,9 @@ def translate(
     param = {
         "files": [file_en],
         "pages": selected_page,
-        "lang_in": "auto",
+        "lang_in": lang_from,
         "lang_out": lang_to,
-        "service": f"{selected_service}:{model_id}",
+        "service": f"{translator.name}",
         "output": output,
         "thread": 4,
         "callback": progress_bar,
@@ -206,19 +243,6 @@ with gr.Blocks(
     .progress-bar {
     border-radius: 8px !important;
     }
-
-    # .input-file label {
-    #     color: #165DFF !important;
-    #     border: 1.2px dashed #165DFF !important;
-    #     border-left: none !important;
-    #     border-top: none !important;
-    # }
-    # .input-file .wrap {
-    #     color: #165DFF !important;
-    # }
-    # .input-file .or {
-    #     color: #165DFF !important;
-    # }
     """,
     head=(
         """
@@ -242,107 +266,70 @@ with gr.Blocks(
     with gr.Row():
         with gr.Column(scale=1):
             gr.Markdown("## File | < 5 MB" if flag_demo else "## File")
+            file_type = gr.Radio(
+                choices=["File", "Link"],
+                label="Type",
+                value="File",
+            )
             file_input = gr.File(
-                label="Document",
+                label="File",
                 file_count="single",
                 file_types=[".pdf"],
                 type="filepath",
                 elem_classes=["input-file"],
             )
+            link_input = gr.Textbox(
+                label="Link",
+                visible=False,
+                interactive=True,
+            )
             gr.Markdown("## Option")
             service = gr.Dropdown(
                 label="Service",
-                info="Which translation service to use. Some require keys",
                 choices=service_map.keys(),
                 value="Google",
             )
-            lang_to = gr.Dropdown(
-                label="Translate to",
-                info="Which language to translate to (optional)",
-                choices=lang_map.keys(),
-                value="Chinese",
-            )
+            envs = []
+            for i in range(3):
+                envs.append(
+                    gr.Textbox(
+                        visible=False,
+                        interactive=True,
+                    )
+                )
+            with gr.Row():
+                lang_from = gr.Dropdown(
+                    label="Translate from",
+                    choices=lang_map.keys(),
+                    value="English",
+                )
+                lang_to = gr.Dropdown(
+                    label="Translate to",
+                    choices=lang_map.keys(),
+                    value="Chinese",
+                )
             page_range = gr.Radio(
                 choices=page_map.keys(),
                 label="Pages",
-                info="Translate the full document or just few pages (optional)",
                 value=list(page_map.keys())[0],
             )
-            model_id = gr.Textbox(
-                label="Model ID",
-                info="Please enter the identifier of the model you wish to use (e.g., gemma2). "
-                "This identifier will be used to specify the particular model for translation.",
-                # value="gemma2",
-                visible=False,  # hide by default
-            )
-            envs_status = "<span class='env-success'>- Properly configured.</span><br>"
 
-            def details_wrapper(text_markdown):
-                text = f"""
-                <details>
-                    <summary>Technical details</summary>
-                    {text_markdown}
-                    - GitHub: <a href="https://github.com/Byaidu/PDFMathTranslate">Byaidu/PDFMathTranslate</a><br>
-                    - GUI by: <a href="https://github.com/reycn">Rongxin</a><br>
-                    - Version: {__version__}
-                </details>"""
-                return text
+            def on_select_service(service, evt: gr.EventData):
+                translator = service_map[service]
+                _envs = []
+                for i in range(3):
+                    _envs.append(gr.update(visible=False, value=""))
+                for i, env in enumerate(translator.envs.items()):
+                    _envs[i] = gr.update(
+                        visible=True, label=env[0], value=os.getenv(env[0], env[1])
+                    )
+                return _envs
 
-            def env_var_checker(env_var_name: str) -> str:
-                if (
-                    not os.environ.get(env_var_name)
-                    or os.environ.get(env_var_name) == ""
-                ):
-                    envs_status = (
-                        f"<span class='env-warning'>- Warning: environmental not found or error ({env_var_name})."
-                        + "</span><br>- Please make sure that the environment variables are properly configured "
-                        + "(<a href='https://github.com/Byaidu/PDFMathTranslate'>guide</a>).<br>"
-                    )
-                else:
-                    value = str(os.environ.get(env_var_name))
-                    envs_status = (
-                        "<span class='env-success'>- Properly configured.</span><br>"
-                    )
-                    if len(value) < 13:
-                        envs_status += (
-                            f"- Env: <code>{os.environ.get(env_var_name)}</code><br>"
-                        )
-                    else:
-                        envs_status += f"- Env: <code>{value[:13]}***</code><br>"
-                return details_wrapper(envs_status)
-
-            def on_select_service(value, evt: gr.EventData):
-                # hide model id by default
-                model_visibility = gr.update(visible=False)
-                # add a text description
-                if value == "Google":
-                    envs_status = details_wrapper(
-                        "<span class='env-success'>- Properly configured.</span><br>"
-                    )
-
-                elif value == "DeepL":
-                    envs_status = env_var_checker("DEEPL_AUTH_KEY")
-                elif value == "DeepLX":
-                    envs_status = env_var_checker("DEEPLX_AUTH_KEY")
-                elif value == "Azure":
-                    envs_status = env_var_checker("AZURE_APIKEY")
-                elif value == "OpenAI":
-                    model_visibility = gr.update(
-                        visible=True, value="gpt-4o"
-                    )  # show model id when service is selected
-                    envs_status = env_var_checker("OPENAI_API_KEY")
-                elif value == "Ollama":
-                    model_visibility = gr.update(
-                        visible=True, value="gemma2"
-                    )  # show model id when service is selected
-                    envs_status = env_var_checker("OLLAMA_HOST")
-                else:
-                    envs_status = (
-                        "<span class='env-warning'>- Warning: model not in the list."
-                        "</span><br>- Please report via "
-                        "(<a href='https://github.com/Byaidu/PDFMathTranslate'>guide</a>).<br>"
-                    )
-                return envs_status, model_visibility
+            def on_select_filetype(file_type):
+                return (
+                    gr.update(visible=file_type == "File"),
+                    gr.update(visible=file_type == "Link"),
+                )
 
             output_title = gr.Markdown("## Translated", visible=False)
             output_file = gr.File(label="Download Translation", visible=False)
@@ -355,10 +342,39 @@ with gr.Blocks(
             recaptcha_box = gr.HTML('<div id="recaptcha-box"></div>')
             translate_btn = gr.Button("Translate", variant="primary")
             tech_details_tog = gr.Markdown(
-                details_wrapper(envs_status),
+                f"""
+                    <summary>Technical details</summary>
+                    - GitHub: <a href="https://github.com/Byaidu/PDFMathTranslate">Byaidu/PDFMathTranslate</a><br>
+                    - GUI by: <a href="https://github.com/reycn">Rongxin</a><br>
+                    - Version: {__version__}
+                """,
                 elem_classes=["secondary-text"],
             )
-            service.select(on_select_service, service, [tech_details_tog, model_id])
+            service.select(
+                on_select_service,
+                service,
+                envs,
+            )
+            file_type.select(
+                on_select_filetype,
+                file_type,
+                [file_input, link_input],
+                js=(
+                    f"""
+                    (a,b)=>{{
+                        try{{
+                            grecaptcha.render('recaptcha-box',{{
+                                'sitekey':'{client_key}',
+                                'callback':'onVerify'
+                            }});
+                        }}catch(error){{}}
+                        return [a];
+                    }}
+                    """
+                    if flag_demo
+                    else ""
+                ),
+            )
 
         with gr.Column(scale=2):
             gr.Markdown("## Preview")
@@ -388,7 +404,17 @@ with gr.Blocks(
 
     translate_btn.click(
         translate,
-        inputs=[file_input, service, model_id, lang_to, page_range, recaptcha_response],
+        inputs=[
+            file_type,
+            file_input,
+            link_input,
+            service,
+            lang_from,
+            lang_to,
+            page_range,
+            recaptcha_response,
+            *envs,
+        ],
         outputs=[
             output_file,
             preview,

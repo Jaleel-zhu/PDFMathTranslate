@@ -10,6 +10,7 @@ from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfparser import PDFParser
 from pdf2zh.converter import TranslateConverter
 from pdf2zh.pdfinterp import PDFPageInterpreterEx
+from pymupdf import Font
 
 
 def extract_text_to_fp(
@@ -26,13 +27,15 @@ def extract_text_to_fp(
     lang_in: str = "",
     lang_out: str = "",
     service: str = "",
+    resfont: str = "",
+    noto: Font = None,
     callback: object = None,
     **kwarg,
 ) -> None:
     rsrcmgr = PDFResourceManager()
     layout = {}
     device = TranslateConverter(
-        rsrcmgr, vfont, vchar, thread, layout, lang_in, lang_out, service
+        rsrcmgr, vfont, vchar, thread, layout, lang_in, lang_out, service, resfont, noto
     )
 
     assert device is not None
@@ -45,13 +48,11 @@ def extract_text_to_fp(
 
     parser = PDFParser(inf)
     doc = PDFDocument(parser, password=password)
-    with tqdm.tqdm(
-        enumerate(PDFPage.create_pages(doc)),
-        total=total_pages,
-    ) as progress:
-        for pageno, page in progress:
+    with tqdm.tqdm(total=total_pages) as progress:
+        for pageno, page in enumerate(PDFPage.create_pages(doc)):
             if pages and (pageno not in pages):
                 continue
+            progress.update()
             if callback:
                 callback(progress)
             page.pageno = pageno
